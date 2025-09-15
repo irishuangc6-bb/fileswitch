@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>图像格式转换器</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color: #f3f3f3;
+    }
+    #drop-area {
+      border: 3px dashed #ccc;
+      padding: 50px;
+      width: 400px;
+      margin: auto;
+      background-color: #fff;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+    #drop-area.hover {
+      border-color: #0078D7;
+      background-color: #e6f7ff;
+    }
+    #counter {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+    #format-selector {
+      margin: 20px auto;
+      font-size: 16px;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>图像格式转换器</h2>
+
+<select id="format-selector">
+  <option value="jpg-png" selected>JPG → PNG</option>
+  <option value="jpg-pdf">JPG → PDF</option>
+  <option value="png-jpg">PNG → JPG</option>
+  <option value="png-pdf">PNG → PDF</option>
+</select>
+
+<div id="drop-area">拖放 JPG 或 PNG 文件到这里</div>
+<div id="counter">已保存 0 个文件</div>
+
+<!-- 引入 jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  let counter = 0;
+  const dropArea = document.getElementById('drop-area');
+  const counterDisplay = document.getElementById('counter');
+  const formatSelector = document.getElementById('format-selector');
+
+  // 阻止默认拖拽行为
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, e => e.preventDefault(), false);
+    document.body.addEventListener(eventName, e => e.preventDefault(), false);
+  });
+
+  // 拖拽视觉效果
+  dropArea.addEventListener('dragover', () => dropArea.classList.add('hover'));
+  dropArea.addEventListener('dragleave', () => dropArea.classList.remove('hover'));
+  dropArea.addEventListener('drop', handleDrop);
+
+  function handleDrop(e) {
+    dropArea.classList.remove('hover');
+    const files = e.dataTransfer.files;
+    const mode = formatSelector.value;
+
+    for (let file of files) {
+      const type = file.type;
+      if (!type.startsWith('image/')) {
+        alert('请仅上传 JPG 或 PNG 图片');
+        continue;
+      }
+
+      // 确认文件类型匹配当前模式
+      if ((mode.startsWith('jpg') && type !== 'image/jpeg') ||
+          (mode.startsWith('png') && type !== 'image/png')) {
+        alert(`此模式只接受 ${mode.startsWith('jpg') ? 'JPG' : 'PNG'} 文件`);
+        continue;
+      }
+
+      if (mode === 'jpg-png') {
+        convertImage(file, 'image/png', 'png');
+      } else if (mode === 'png-jpg') {
+        convertImage(file, 'image/jpeg', 'jpg');
+      } else if (mode === 'jpg-pdf' || mode === 'png-pdf') {
+        convertImageToPDF(file);
+      }
+    }
+  }
+
+  // 图像格式转换
+  function convertImage(file, outputType, ext) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob(function (blob) {
+          counter++;
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `converted_${counter}.${ext}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          counterDisplay.innerText = `已保存 ${counter} 个文件`;
+        }, outputType);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // 图片转 PDF
+  function convertImageToPDF(file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = async function () {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: img.width > img.height ? 'l' : 'p',
+          unit: 'pt',
+          format: [img.width, img.height]
+        });
+
+        pdf.addImage(img, 'JPEG', 0, 0, img.width, img.height);
+        counter++;
+        pdf.save(`converted_${counter}.pdf`);
+        counterDisplay.innerText = `已保存 ${counter} 个文件`;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+</script>
+
+</body>
+</html>
